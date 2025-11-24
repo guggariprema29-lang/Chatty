@@ -45,6 +45,26 @@ const messageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // If message was deleted for everyone (soft-deleted globally)
+    deletedForEveryone: {
+      type: Boolean,
+      default: false,
+    },
+    // Track who deleted the message and when (for undo)
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    // Preserve original text to support undo
+    originalText: {
+      type: String,
+      default: null,
+    },
     autoDeleteEnabled: {
       type: Boolean,
       default: false,

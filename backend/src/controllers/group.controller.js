@@ -132,3 +132,47 @@ export const updateGroup = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
+// Member leaves the group (remove self)
+export const leaveGroup = async (req, res) => {
+  try {
+    const { id: groupId } = req.params;
+    const userId = req.user._id;
+
+    const group = await Group.findById(groupId);
+    if (!group) return res.status(404).json({ message: 'Group not found' });
+
+    // remove member and admin rights if present
+    group.members = group.members.filter((m) => String(m.user) !== String(userId));
+    group.admins = group.admins.filter((a) => String(a) !== String(userId));
+
+    await group.save();
+
+    res.status(200).json({ message: 'Left group', group });
+  } catch (err) {
+    console.error('leaveGroup error', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Toggle block/unblock group for current user
+export const toggleBlockGroup = async (req, res) => {
+  try {
+    const { id: groupId } = req.params;
+    const userId = req.user._id;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const idx = (user.blockedGroups || []).indexOf(String(groupId));
+    if (idx === -1) user.blockedGroups.push(String(groupId));
+    else user.blockedGroups.splice(idx, 1);
+
+    await user.save();
+
+    res.status(200).json({ blockedGroups: user.blockedGroups });
+  } catch (err) {
+    console.error('toggleBlockGroup error', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};

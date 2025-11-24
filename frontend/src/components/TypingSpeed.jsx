@@ -21,7 +21,9 @@ const TypingSpeed = ({ game, onMove, currentUser, onClose }) => {
       setStarted(true);
       startRef.current = Date.now();
     }
-    setText(val);
+    // enforce max length equal to prompt length
+    const capped = val.slice(0, prompt.length);
+    setText(capped);
   };
 
   const handleFinish = async () => {
@@ -57,8 +59,27 @@ const TypingSpeed = ({ game, onMove, currentUser, onClose }) => {
   <p className="mb-3 text-sm">Type the text below as quickly and accurately as you can. Press Finish when done.</p>
   {currentUser && <div className="text-xs text-neutral mb-2">Player: {playerName}</div>}
 
-      <div className="p-3 border rounded mb-3 bg-base-200">
-        <p>{prompt}</p>
+      <div className="p-3 border rounded mb-3 bg-base-200 font-mono">
+        {/* Render prompt with per-character coloring based on typed input */}
+        <p className="break-words leading-relaxed">
+          {Array.from(prompt).map((ch, idx) => {
+            const typedChar = text[idx];
+            let cls = "opacity-60";
+            if (typedChar !== undefined) {
+              if (typedChar === ch) cls = "text-success";
+              else cls = "text-error";
+            }
+
+            // visually show spaces and control characters clearly
+            const display = ch === " " ? "\u00A0" : ch;
+
+            return (
+              <span key={idx} className={`inline-block ${cls}`}>
+                {display}
+              </span>
+            );
+          })}
+        </p>
       </div>
 
       <textarea
@@ -66,7 +87,17 @@ const TypingSpeed = ({ game, onMove, currentUser, onClose }) => {
         onChange={(e) => handleChange(e.target.value)}
         placeholder="Start typing here..."
         className="textarea w-full h-28"
+        aria-label="Type the prompt text"
       />
+
+      {/* show mistakes count */}
+      <div className="text-sm mt-2">
+        {text.length > 0 && (
+          <span>
+            Mistakes: <strong className="text-error">{Array.from(text).reduce((acc, c, i) => acc + (c === prompt[i] ? 0 : 1), 0)}</strong>
+          </span>
+        )}
+      </div>
 
       <div className="mt-3 flex gap-2">
         <button className="btn btn-primary btn-sm" onClick={handleFinish} disabled={finished}>Finish</button>

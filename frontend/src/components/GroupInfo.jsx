@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useChatStore } from "../store/useChatStore";
+import { useAuthStore } from "../store/useAuthStore";
 import { Users, UserPlus, Settings, X } from "lucide-react";
 
 const GroupInfo = ({ isOpen, onClose, group }) => {
@@ -39,27 +41,44 @@ const GroupInfo = ({ isOpen, onClose, group }) => {
           </div>
 
           <div className="max-h-64 overflow-y-auto space-y-2">
-            {group.members?.map((member) => (
-              <div key={member.user?._id || member._id} className="flex items-center gap-3 p-2 hover:bg-base-200 rounded">
-                <div className="avatar">
-                  <div className="w-10 h-10 rounded-full">
-                    <img 
-                      src={member.user?.profilePic || "/avatar.png"} 
-                      alt={member.user?.fullName || "Member"} 
-                    />
+            {group.members?.map((member) => {
+              const currentUser = useAuthStore.getState().authUser || {};
+              const isAdmin = group.admins?.map((a) => String(a)).includes(String(currentUser._id));
+              const memberId = member.user?._id || member._id;
+              const isMemberAdmin = group.admins?.map((a) => String(a)).includes(String(memberId));
+
+              const handleRemove = async () => {
+                if (!window.confirm(`Remove ${member.user?.fullName || 'this member'} from the group?`)) return;
+                try {
+                  await useChatStore.getState().removeGroupMember(group._id, member.user?._id || member._id);
+                } catch (err) {
+                  console.error(err);
+                }
+              };
+
+              return (
+                <div key={member.user?._id || member._id} className="flex items-center gap-3 p-2 hover:bg-base-200 rounded">
+                  <div className="avatar">
+                    <div className="w-10 h-10 rounded-full">
+                      <img
+                        src={member.user?.profilePic || "/avatar.png"}
+                        alt={member.user?.fullName || "Member"}
+                      />
+                    </div>
                   </div>
+                  <div className="flex-1">
+                    <p className="font-medium">{member.user?.fullName || "Unknown"}</p>
+                    <p className="text-xs text-gray-500">{member.user?.email || ""}</p>
+                  </div>
+                  {isMemberAdmin && (
+                    <span className="badge badge-sm badge-primary">Admin</span>
+                  )}
+                  {isAdmin && !isMemberAdmin && (
+                    <button onClick={handleRemove} className="btn btn-xs btn-ghost text-error">Remove</button>
+                  )}
                 </div>
-                <div className="flex-1">
-                  <p className="font-medium">{member.user?.fullName || "Unknown"}</p>
-                  <p className="text-xs text-gray-500">{member.user?.email || ""}</p>
-                </div>
-                {group.admins?.some(admin => 
-                  String(admin) === String(member.user?._id || member.user)
-                ) && (
-                  <span className="badge badge-sm badge-primary">Admin</span>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

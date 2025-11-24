@@ -6,6 +6,7 @@ import FeedbackInbox from "./FeedbackInbox";
 import RemindersList from "./RemindersList";
 import FocusModeToggle from "./FocusModeToggle";
 import { axiosInstance } from "../lib/axios";
+import { useReminderBuzzer, requestNotificationPermission } from "../hooks/useReminderBuzzer";
 
 const Navbar = () => {
   const { logout, authUser } = useAuthStore();
@@ -15,15 +16,24 @@ const Navbar = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [upcomingCount, setUpcomingCount] = useState(0);
   const [focusModeEnabled, setFocusModeEnabled] = useState(false);
+  const [remindersList, setRemindersList] = useState([]);
+  const [bellSoundPreferences, setBellSoundPreferences] = useState(null);
+
+  // Use the buzzer hook to monitor and alert for reminders
+  useReminderBuzzer(remindersList, bellSoundPreferences);
 
   useEffect(() => {
     if (authUser) {
       loadUnreadCount();
       loadUpcomingReminders();
+      loadBellSoundPreferences();
+      // Request notification permission on app load
+      requestNotificationPermission();
       // Poll every 30 seconds
       const interval = setInterval(() => {
         loadUnreadCount();
         loadUpcomingReminders();
+        loadBellSoundPreferences();
       }, 30000);
       return () => clearInterval(interval);
     }
@@ -41,9 +51,27 @@ const Navbar = () => {
   const loadUpcomingReminders = async () => {
     try {
       const res = await axiosInstance.get("/reminders/upcoming");
-      setUpcomingCount(res.data.filter((r) => !r.isCompleted).length);
+      const reminders = res.data.filter((r) => !r.isCompleted);
+      setRemindersList(reminders);
+      setUpcomingCount(reminders.length);
     } catch (error) {
       console.error("Failed to load reminders:", error);
+    }
+  };
+
+  const loadBellSoundPreferences = async () => {
+    try {
+      const res = await axiosInstance.get("/auth/bell-sounds/preferences");
+      setBellSoundPreferences(res.data);
+      console.log("Bell sound preferences loaded:", res.data);
+    } catch (error) {
+      console.error("Failed to load bell sound preferences:", error);
+      // Set default preferences if endpoint fails
+      setBellSoundPreferences({
+        bellSoundPreference: "classic",
+        bellSoundVolume: 0.5,
+        bellSoundEnabled: true,
+      });
     }
   };
 
@@ -66,6 +94,7 @@ const Navbar = () => {
               </div>
               <h1 className="text-lg font-bold">Chatty</h1>
             </Link>
+            {/* Public Chat removed */}
           </div>
 
           <div className="flex items-center gap-2">

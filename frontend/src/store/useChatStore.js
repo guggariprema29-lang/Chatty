@@ -36,7 +36,9 @@ export const useChatStore = create((set, get) => ({
     set({ activeChats: newList });
     try {
       localStorage.setItem('activeChats', JSON.stringify(newList));
-    } catch {}
+    } catch {
+      // suppress storage errors silently
+    }
   },
 
   getFirstActiveChat: () => {
@@ -50,6 +52,20 @@ export const useChatStore = create((set, get) => ({
       set({ groups: res.data });
     } catch (error) {
       const msg = error?.response?.data?.message || error.message || "Failed to load groups";
+      toast.error(msg);
+    }
+  },
+
+  // Remove a member from a group (admin action)
+  removeGroupMember: async (groupId, memberId) => {
+    try {
+      const res = await axiosInstance.delete(`/groups/${groupId}/members/${memberId}`);
+      toast.success('Member removed');
+      // refresh groups list
+      get().getGroups();
+      return res.data;
+    } catch (err) {
+      const msg = err?.response?.data?.message || err.message || 'Failed to remove member';
       toast.error(msg);
     }
   },
@@ -253,14 +269,16 @@ export const useChatStore = create((set, get) => ({
 
   setSelectedUser: (selectedUser) => {
     // clear unread count for the selected user locally
-    const users = get().users || [];
-    const idx = users.findIndex((u) => String(u._id) === String(selectedUser._id));
-    if (idx !== -1) {
-      const user = users[idx];
-      const updatedUser = { ...user, unreadCount: 0 };
-      const newUsers = [...users];
-      newUsers[idx] = updatedUser;
-      set({ users: newUsers });
+    if (selectedUser) {
+      const users = get().users || [];
+      const idx = users.findIndex((u) => String(u._id) === String(selectedUser._id));
+      if (idx !== -1) {
+        const user = users[idx];
+        const updatedUser = { ...user, unreadCount: 0 };
+        const newUsers = [...users];
+        newUsers[idx] = updatedUser;
+        set({ users: newUsers });
+      }
     }
     // clear any selected group when selecting a user
     set({ selectedUser, selectedGroup: null });
@@ -309,6 +327,54 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  deleteMessageForEveryone: async (messageId) => {
+    try {
+      const res = await axiosInstance.put(`/messages/${messageId}/delete-everyone`);
+      const messages = get().messages.map((msg) => (msg._id === messageId ? res.data : msg));
+      set({ messages });
+      toast.success("Message deleted for everyone");
+    } catch (error) {
+      const msg = error?.response?.data?.message || error.message || "Failed to delete for everyone";
+      toast.error(msg);
+    }
+  },
+
+  undoDeleteMessage: async (messageId) => {
+    try {
+      const res = await axiosInstance.put(`/messages/${messageId}/undo`);
+      const messages = get().messages.map((msg) => (msg._id === messageId ? res.data : msg));
+      set({ messages });
+      toast.success("Message restored");
+    } catch (error) {
+      const msg = error?.response?.data?.message || error.message || "Failed to undo delete";
+      toast.error(msg);
+    }
+  },
+
+  adminDeleteMessage: async (messageId) => {
+    try {
+      const res = await axiosInstance.put(`/messages/${messageId}/admin-delete`);
+      const messages = get().messages.map((msg) => (msg._id === messageId ? res.data : msg));
+      set({ messages });
+      toast.success("Message removed by admin");
+    } catch (error) {
+      const msg = error?.response?.data?.message || error.message || "Failed admin delete";
+      toast.error(msg);
+    }
+  },
+
+  toggleDisappearing: async (messageId, enable, expiresAt = null) => {
+    try {
+      const res = await axiosInstance.put(`/messages/${messageId}/toggle-disappearing`, { enable, expiresAt });
+      const messages = get().messages.map((msg) => (msg._id === messageId ? res.data : msg));
+      set({ messages });
+      toast.success("Disappearing setting updated");
+    } catch (error) {
+      const msg = error?.response?.data?.message || error.message || "Failed to update disappearing setting";
+      toast.error(msg);
+    }
+  },
+
   editMessage: async (messageId, newText) => {
     try {
       const res = await axiosInstance.put(`/messages/${messageId}/edit`, { text: newText });
@@ -348,6 +414,77 @@ export const useChatStore = create((set, get) => ({
       toast.success(res.data.isPinned ? "Message pinned" : "Message unpinned");
     } catch (error) {
       const msg = error?.response?.data?.message || error.message || "Failed to pin message";
+      toast.error(msg);
+    }
+  },
+  // Toggle archive for a chat (user or group)
+  toggleArchiveChat: async (chat) => {
+    try {
+      const chatType = chat.type; // 'user' or 'group'
+      const chatId = chat.id;
+      const res = await axiosInstance.put('/auth/chat/archive', { chatType, chatId });
+      toast.success('Chat archive toggled');
+      // update auth store so UI reacts to change immediately
+      try {
+        const authUser = useAuthStore.getState().authUser || {};
+        useAuthStore.setState({ authUser: { ...authUser, archivedChats: res.data.archivedChats } });
+      } catch (e) {
+        // ignore
+      }
+      return res.data;
+    } catch (err) {
+      const msg = err?.response?.data?.message || err.message || 'Failed to toggle archive';
+      toast.error(msg);
+    }
+  },
+
+  // Toggle hide for a chat (user or group)
+  toggleHideChat: async (chat) => {
+    try {
+      const chatType = chat.type;
+      const chatId = chat.id;
+      const res = await axiosInstance.put('/auth/chat/hide', { chatType, chatId });
+      toast.success('Chat hide toggled');
+      try {
+        const authUser = useAuthStore.getState().authUser || {};
+        useAuthStore.setState({ authUser: { ...authUser, hiddenChats: res.data.hiddenChats } });
+      } catch (e) {
+        // ignore
+      }
+      return res.data;
+    } catch (err) {
+      const msg = err?.response?.data?.message || err.message || 'Failed to toggle hide';
+      toast.error(msg);
+    }
+  },
+
+  // Leave a group (current user)
+  leaveGroup: async (groupId) => {
+    try {
+      const res = await axiosInstance.post(`/groups/${groupId}/leave`);
+      toast.success('You left the group');
+      // refresh groups list
+      get().getGroups();
+      return res.data;
+    } catch (err) {
+      const msg = err?.response?.data?.message || err.message || 'Failed to leave group';
+      toast.error(msg);
+    }
+  },
+
+  // Block/unblock a group for current user
+  toggleBlockGroup: async (groupId) => {
+    try {
+      const res = await axiosInstance.put(`/groups/${groupId}/block`);
+      toast.success('Group block toggled');
+      // update auth user blockedGroups so UI can react
+      try {
+        const authUser = useAuthStore.getState().authUser || {};
+        useAuthStore.setState({ authUser: { ...authUser, blockedGroups: res.data.blockedGroups } });
+      } catch (e) {}
+      return res.data;
+    } catch (err) {
+      const msg = err?.response?.data?.message || err.message || 'Failed to toggle block';
       toast.error(msg);
     }
   },

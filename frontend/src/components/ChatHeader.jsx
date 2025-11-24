@@ -1,17 +1,18 @@
 import { X, Info, Palette, FileText } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import GroupInfo from "./GroupInfo";
 import SendFeedbackModal from "./SendFeedbackModal";
 import ThemeSelector from "./ThemeSelector";
+import { applyTheme, getTheme } from "../lib/chatThemes";
 // Push/Notifications components removed to restore original header
 // import EmotionSearch from "./EmotionSearch";
 import ChatSummaryModal from "./ChatSummaryModal";
 // import FocusModeToggle from "./FocusModeToggle";
 
 const ChatHeader = () => {
-  const { selectedUser, selectedGroup, setSelectedUser, setSelectedGroup } = useChatStore();
+  const { selectedUser, selectedGroup, setSelectedUser, setSelectedGroup, leaveGroup, toggleBlockGroup } = useChatStore();
   const { onlineUsers } = useAuthStore();
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -20,6 +21,17 @@ const ChatHeader = () => {
   const [showSummary, setShowSummary] = useState(false);
   // const [showFocusMode, setShowFocusMode] = useState(false);
   const [currentTheme, setCurrentTheme] = useState("default");
+
+  // Apply the currently selected theme when it changes (or on mount)
+  useEffect(() => {
+    try {
+      // currentTheme may be an id or a name
+      const resolved = getTheme(typeof currentTheme === 'string' ? currentTheme.toLowerCase() : currentTheme);
+      if (resolved) applyTheme(resolved);
+    } catch (err) {
+      // swallow
+    }
+  }, [currentTheme]);
 
   return (
     <div className="p-2.5 border-b border-base-300">
@@ -63,6 +75,59 @@ const ChatHeader = () => {
             >
               <Palette size={16} />
             </button>
+
+            <button
+              onClick={async () => {
+                try {
+                  const chat = selectedGroup ? { type: 'group', id: selectedGroup._id } : selectedUser ? { type: 'user', id: selectedUser._id } : null;
+                  if (!chat) return;
+                  await useChatStore.getState().toggleArchiveChat(chat);
+                } catch (err) {
+                  console.error(err);
+                }
+              }}
+              className="btn btn-ghost btn-sm btn-circle"
+              title="Archive chat"
+            >
+              📥
+            </button>
+
+            {selectedGroup && (
+              <>
+                <button
+                  className="btn btn-ghost btn-sm btn-circle"
+                  title="Leave group"
+                  onClick={async () => {
+                    if (!selectedGroup) return;
+                    if (!window.confirm('Are you sure you want to leave this group?')) return;
+                    try {
+                      await leaveGroup(selectedGroup._id);
+                      // close group view
+                      setSelectedGroup(null);
+                    } catch (err) {
+                      console.error(err);
+                    }
+                  }}
+                >
+                  Exit
+                </button>
+
+                <button
+                  className="btn btn-ghost btn-sm btn-circle"
+                  title="Block/Unblock group"
+                  onClick={async () => {
+                    if (!selectedGroup) return;
+                    try {
+                      await toggleBlockGroup(selectedGroup._id);
+                    } catch (err) {
+                      console.error(err);
+                    }
+                  }}
+                >
+                  Block
+                </button>
+              </>
+            )}
 
             {/* Notifications and push toggle removed */}
 
@@ -110,8 +175,15 @@ const ChatHeader = () => {
         onClose={() => setShowThemeSelector(false)}
         currentTheme={currentTheme}
         onSelectTheme={(theme) => {
+          // Update current theme label
           setCurrentTheme(theme.id || theme.name);
-          // Apply theme (would save to backend in production)
+          // Apply theme CSS variables immediately
+          try {
+            applyTheme(theme);
+          } catch (err) {
+            // Fallback: if theme is a plain id/name, resolve and apply via import
+            console.error("Failed to apply theme:", err);
+          }
         }}
         contactName={selectedGroup ? selectedGroup.name : selectedUser?.fullName}
       />
@@ -124,6 +196,8 @@ const ChatHeader = () => {
       <ChatSummaryModal
         isOpen={showSummary}
         onClose={() => setShowSummary(false)}
+        chatId={selectedGroup ? selectedGroup._id : selectedUser?._id}
+        chatType={selectedGroup ? "group" : "user"}
       />
     </div>
   );

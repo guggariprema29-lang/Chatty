@@ -12,7 +12,14 @@ const MessageContextMenu = ({
   onCopy, 
   onForward,
   onShare,
-  isOwnMessage 
+  isOwnMessage,
+  // optional enhanced actions
+  onDeleteForEveryone,
+  onUndo,
+  onAdminDelete,
+  onToggleDisappearing,
+  isAdmin,
+  isGroupMessage
 }) => {
   const menuRef = useRef(null);
 
@@ -70,7 +77,49 @@ const MessageContextMenu = ({
                 <Trash2 size={16} />
                 Delete
               </button>
+              {/* Delete for everyone */}
+              {onDeleteForEveryone && (
+                <button
+                  onClick={() => handleAction(onDeleteForEveryone)}
+                  className="w-full px-4 py-2 text-left hover:bg-base-300 flex items-center gap-3 text-sm text-error"
+                >
+                  <Trash2 size={16} />
+                  Delete for everyone
+                </button>
+              )}
             </>
+          )}
+
+          {/* Admin remove option for group messages */}
+          {!isOwnMessage && isAdmin && onAdminDelete && (
+            <button
+              onClick={() => handleAction(onAdminDelete)}
+              className="w-full px-4 py-2 text-left hover:bg-base-300 flex items-center gap-3 text-sm text-error"
+            >
+              <Trash2 size={16} />
+              Remove (admin)
+            </button>
+          )}
+
+          {/* Undo deleted message (if available) */}
+          {message.isDeleted && onUndo && (
+            <button
+              onClick={() => handleAction(onUndo)}
+              className="w-full px-4 py-2 text-left hover:bg-base-300 flex items-center gap-3 text-sm"
+            >
+              <Edit size={16} />
+              Undo Delete
+            </button>
+          )}
+
+          {/* Toggle disappearing */}
+          {onToggleDisappearing && (
+            <button
+              onClick={() => handleAction(() => onToggleDisappearing(!message.autoDeleteEnabled))}
+              className="w-full px-4 py-2 text-left hover:bg-base-300 flex items-center gap-3 text-sm"
+            >
+              {message.autoDeleteEnabled ? 'Disable Disappearing' : 'Make Disappearing'}
+            </button>
           )}
 
           <button

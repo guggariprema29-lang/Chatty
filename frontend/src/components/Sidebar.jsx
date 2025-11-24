@@ -6,13 +6,15 @@ import CreateGroupModal from "./CreateGroupModal";
 import { Users } from "lucide-react";
 
 const Sidebar = () => {
-  const { getUsers, users, selectedUser, setSelectedUser, isUsersLoading, groups, getGroups, selectedGroup, setSelectedGroup } = useChatStore();
+  const { getUsers, users, selectedUser, setSelectedUser, isUsersLoading, groups, getGroups, selectedGroup, setSelectedGroup, toggleArchiveChat } = useChatStore();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-  const { onlineUsers } = useAuthStore();
+  const { onlineUsers, authUser } = useAuthStore();
   const [showOnlineOnly, setShowOnlineOnly] = useState(false);
   const [query, setQuery] = useState("");
+  const [viewMode, setViewMode] = useState('chats'); // 'chats' | 'archived'
+  // Removed showHidden state
 
   useEffect(() => {
     getUsers();
@@ -21,6 +23,10 @@ const Sidebar = () => {
 
   const filteredUsers = (users || [])
     .filter((user) => {
+      const archivedKey = `user:${user._id}`;
+      const archivedList = (authUser && authUser.archivedChats) || [];
+      if (viewMode === 'archived' && !archivedList.includes(archivedKey)) return false;
+      if (viewMode === 'chats' && archivedList.includes(archivedKey)) return false;
       if (showOnlineOnly && !onlineUsers.includes(user._id)) return false;
       if (!query) return true;
       return user.fullName.toLowerCase().includes(query.toLowerCase());
@@ -58,6 +64,13 @@ const Sidebar = () => {
           </label>
           <span className="text-xs text-zinc-500">({onlineUsers.length - 1} online)</span>
         </div>
+        <div className="mt-3 flex items-center gap-2">
+            <div className="btn-group">
+            <button onClick={() => setViewMode('chats')} className={`btn btn-sm ${viewMode === 'chats' ? 'btn-primary' : 'btn-ghost'}`}>Chats</button>
+            <button onClick={() => setViewMode('archived')} className={`btn btn-sm ${viewMode === 'archived' ? 'btn-primary' : 'btn-ghost'}`}>Archived</button>
+          </div>
+            {/* Show hidden option removed - Hidden view is a dedicated tab */}
+        </div>
       </div>
 
       <div className="overflow-y-auto w-full py-3">
@@ -68,24 +81,32 @@ const Sidebar = () => {
             <button className="btn btn-xs" onClick={() => setIsCreateOpen(true)}>New</button>
           </div>
           {groups?.map((g) => (
-            <button
-              key={g._id}
-              onClick={() => {
-                setSelectedGroup(g);
-              }}
-              className={`w-full p-2 flex items-center gap-3 hover:bg-base-300 transition-colors rounded-md ${
-                selectedUser === null && selectedGroup?._id === g._id ? "bg-base-300 ring-1 ring-base-300" : ""
-              }`}
-            >
-              <img src={g.photo || "/avatar.png"} alt={g.name} className="size-10 rounded-full object-cover" />
-              <div className="hidden lg:block text-left min-w-0">
-                <div className="font-medium truncate">{g.name}</div>
-                <div className="text-sm text-zinc-400 truncate">{g.lastMessage?.text || g.description}</div>
-              </div>
-              {g.unreadCount > 0 && (
-                <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{g.unreadCount}</span>
-              )}
-            </button>
+            (() => {
+              const archivedList = (authUser && authUser.archivedChats) || [];
+              const archivedKey = `group:${g._id}`;
+              if (viewMode === 'archived' && !archivedList.includes(archivedKey)) return null;
+              if (viewMode === 'chats' && archivedList.includes(archivedKey)) return null;
+              return (
+                <button
+                  key={g._id}
+                  onClick={() => {
+                    setSelectedGroup(g);
+                  }}
+                  className={`w-full p-2 flex items-center gap-3 hover:bg-base-300 transition-colors rounded-md ${
+                    selectedUser === null && selectedGroup?._id === g._id ? "bg-base-300 ring-1 ring-base-300" : ""
+                  }`}
+                >
+                  <img src={g.photo || "/avatar.png"} alt={g.name} className="size-10 rounded-full object-cover" />
+                  <div className="hidden lg:block text-left min-w-0">
+                    <div className="font-medium truncate">{g.name}</div>
+                    <div className="text-sm text-zinc-400 truncate">{g.lastMessage?.text || g.description}</div>
+                  </div>
+                  {g.unreadCount > 0 && (
+                    <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{g.unreadCount}</span>
+                  )}
+                </button>
+              );
+            })()
           ))}
         </div>
 
@@ -134,7 +155,9 @@ const Sidebar = () => {
         ))}
 
         {filteredUsers.length === 0 && (
-          <div className="text-center text-zinc-500 py-4">No online users</div>
+          <div className="text-center text-zinc-500 py-4">
+            {viewMode === 'archived' ? 'No archived chats' : 'No chats'}
+          </div>
         )}
       </div>
     </aside>

@@ -96,6 +96,12 @@ const FeedbackInbox = ({ isOpen, onClose }) => {
               <p className="text-sm text-gray-500">
                 Anonymous feedback from others will appear here
               </p>
+              {/* Add a clear Close button in the empty state so users can dismiss the modal */}
+              <div className="mt-6">
+                <button onClick={onClose} className="btn btn-sm btn-primary">
+                  Close
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-3">

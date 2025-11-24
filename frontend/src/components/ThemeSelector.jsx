@@ -17,28 +17,36 @@ const ThemeSelector = ({ isOpen, onClose, currentTheme, onSelectTheme, contactNa
   };
 
   const handleAIGenerate = () => {
-    // Simple AI-like generation based on contact name
-    const keywords = contactName ? [contactName.toLowerCase()] : [];
-    
-    // Add some personality detection
+    // Build keyword tokens from the contact name and simple heuristics
+    const keywords = [];
     if (contactName) {
-      if (contactName.toLowerCase().includes("love") || contactName.toLowerCase().includes("heart")) {
-        keywords.push("romantic");
-      }
-      if (contactName.toLowerCase().includes("pro") || contactName.toLowerCase().includes("work")) {
-        keywords.push("professional");
-      }
+      // split words and emoji-ish characters
+      const tokens = contactName
+        .toLowerCase()
+        .replace(/[^a-z0-9\s\u00C0-\u017F\u2190-\u21FF\u2600-\u26FF]/g, " ")
+        .split(/\s+/)
+        .filter(Boolean);
+      keywords.push(...tokens);
+
+      // quick heuristics
+      const lower = contactName.toLowerCase();
+      if (lower.includes("love") || lower.includes("heart") || lower.includes("❤️")) keywords.push("romantic");
+      if (lower.includes("pro") || lower.includes("work") || lower.includes("office")) keywords.push("professional");
+      if (lower.includes("art") || lower.includes("design") || lower.includes("creative")) keywords.push("creative");
+      if (lower.includes("green") || lower.includes("forest") || lower.includes("eco")) keywords.push("nature");
+      if (lower.includes("dark") || lower.includes("night") || lower.includes("moon")) keywords.push("dark");
+      if (lower.includes("warm") || lower.includes("coffee") || lower.includes("cozy")) keywords.push("warm");
+      if (lower.includes("happy") || lower.includes("cheer")) keywords.push("happy");
     }
 
     const aiTheme = generateThemeFromPersonality(keywords);
-    const themeId = themes.find((t) => 
-      t.primaryColor === aiTheme.primaryColor && t.name === aiTheme.name
-    )?.id || "default";
 
-    setSelectedTheme(themeId);
-    if (onSelectTheme) {
-      onSelectTheme(aiTheme);
-    }
+    // Try to find a preset id that matches the returned preset
+    const matched = themes.find((t) => t.name === aiTheme.name || t.primaryColor === aiTheme.primaryColor);
+    const themeToApply = matched ? { id: matched.id, ...matched } : { id: aiTheme.name?.toLowerCase() || 'default', ...aiTheme };
+
+    setSelectedTheme(themeToApply.id);
+    if (onSelectTheme) onSelectTheme(themeToApply);
     toast.success("AI theme generated! ✨", { icon: "🎨" });
   };
 

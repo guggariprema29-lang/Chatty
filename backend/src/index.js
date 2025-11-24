@@ -59,6 +59,7 @@ app.use("/api/reminders", reminderRoutes);
 app.use("/api/themes", themeRoutes);
 app.use("/api/games", gameRoutes);
 app.use("/api/focus-mode", focusModeRoutes);
+app.use("/api/focus-mode", focusModeRoutes);
 
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/dist")));

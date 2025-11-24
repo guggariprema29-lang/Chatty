@@ -1,3 +1,5 @@
+import { detectMood } from "./moodDetection";
+
 export const generateChatSummary = (messages, date = new Date()) => {
   if (!messages || messages.length === 0) {
     return {
@@ -57,7 +59,9 @@ export const generateChatSummary = (messages, date = new Date()) => {
     messageCount,
     summary,
     participants,
-    duration
+    duration,
+    topics,
+    sentiment
   };
 };
 
@@ -107,6 +111,15 @@ export const getSentimentOverview = (messages) => {
     };
   }
   
+  const moodToScore = (mood) => {
+    if (!mood) return 0;
+    const positive = new Set(["happy", "excited", "love", "grateful", "laughing", "cool", "celebration", "playful", "determined", "peaceful", "romantic"]);
+    const negative = new Set(["sad", "angry", "worried", "tired", "sick", "confused", "thinking"]);
+    if (positive.has(mood)) return 0.8;
+    if (negative.has(mood)) return -0.8;
+    return 0;
+  };
+
   let positive = 0;
   let negative = 0;
   let neutral = 0;
@@ -114,12 +127,26 @@ export const getSentimentOverview = (messages) => {
   let scoreCount = 0;
   
   messages.forEach(message => {
-    if (!message.sentiment || typeof message.sentiment.score !== 'number') return;
-    
-    const score = message.sentiment.score;
+    let score = null;
+
+    if (message.sentiment && typeof message.sentiment.score === 'number') {
+      score = message.sentiment.score;
+    } else if (message.text && typeof message.text === 'string') {
+      // Fallback: derive sentiment from detected mood
+      const moodResult = detectMood(message.text);
+      if (moodResult && moodResult.mood) {
+        score = moodToScore(moodResult.mood);
+      } else {
+        score = 0;
+      }
+    } else {
+      return; // no text and no sentiment -> skip
+    }
+
+    // accumulate
     totalScore += score;
     scoreCount++;
-    
+
     if (score > 0.3) positive++;
     else if (score < -0.3) negative++;
     else neutral++;

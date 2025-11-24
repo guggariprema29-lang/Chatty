@@ -30,6 +30,10 @@ const ChatContainer = () => {
     subscribeToMessages,
     unsubscribeFromMessages,
     deleteMessage,
+    deleteMessageForEveryone,
+    undoDeleteMessage,
+    adminDeleteMessage,
+    toggleDisappearing,
     editMessage,
     starMessage,
     pinMessage,
@@ -263,6 +267,26 @@ const ChatContainer = () => {
     }
   };
 
+  const handleDeleteForEveryone = async (messageId) => {
+    if (window.confirm("Delete this message for everyone?")) {
+      await deleteMessageForEveryone(messageId);
+    }
+  };
+
+  const handleUndoDelete = async (messageId) => {
+    await undoDeleteMessage(messageId);
+  };
+
+  const handleAdminDelete = async (messageId) => {
+    if (window.confirm("Remove this message for everyone as admin?")) {
+      await adminDeleteMessage(messageId);
+    }
+  };
+
+  const handleToggleDisappearing = async (messageId, enable) => {
+    await toggleDisappearing(messageId, enable);
+  };
+
   const handleEdit = (message) => {
     setEditModal(message);
   };
@@ -306,14 +330,14 @@ const ChatContainer = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-auto">
+    <div className="flex-1 flex flex-col overflow-auto" style={{ background: 'var(--chat-bg, transparent)' }}>
       <ChatHeader />
 
       {isTyping && selectedUser && (
         <TypingIndicator name={selectedUser.fullName} />
       )}
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4" style={{ background: 'transparent' }}>
         {/* Display Active Games */}
         {games.map((game) => (
           <div key={game._id} className="my-3">
@@ -376,7 +400,14 @@ const ChatContainer = () => {
                   <span className="text-xs opacity-50 ml-2">(edited)</span>
                 )}
               </div>
-            <div className="chat-bubble flex flex-col relative">
+            <div
+              className="chat-bubble flex flex-col relative"
+              style={{
+                backgroundColor: isOwnMessage ? 'var(--chat-primary)' : 'var(--chat-secondary)',
+                color: 'var(--chat-text)',
+                opacity: 'var(--chat-bubble-opacity, 1)'
+              }}
+            >
               {message.isPinned && (
                 <div className="absolute -top-2 -right-2 bg-warning rounded-full p-1">
                   <Pin size={12} fill="currentColor" />
@@ -437,7 +468,14 @@ const ChatContainer = () => {
       <MessageInput />
 
       {contextMenu && (
-        <MessageContextMenu
+        (() => {
+          const msg = contextMenu.message;
+          const isOwn = typeof msg.senderId === 'object' ? msg.senderId._id === authUser._id : msg.senderId === authUser._id;
+          const isAdmin = selectedGroup && selectedGroup.admins ? selectedGroup.admins.map(a => String(a)).includes(String(authUser._id)) : false;
+          const allowToggleDisappearing = isOwn || (selectedGroup && isAdmin);
+
+          return (
+            <MessageContextMenu
           message={contextMenu.message}
           position={contextMenu.position}
           onClose={() => setContextMenu(null)}
@@ -453,7 +491,15 @@ const ChatContainer = () => {
               ? contextMenu.message.senderId._id === authUser._id 
               : contextMenu.message.senderId === authUser._id
           }
+          onDeleteForEveryone={() => handleDeleteForEveryone(contextMenu.message._id)}
+          onUndo={() => handleUndoDelete(contextMenu.message._id)}
+          onAdminDelete={() => handleAdminDelete(contextMenu.message._id)}
+          {...(allowToggleDisappearing ? { onToggleDisappearing: (enable) => handleToggleDisappearing(contextMenu.message._id, enable) } : {})}
+          isAdmin={isAdmin}
+          isGroupMessage={!!selectedGroup}
         />
+          );
+        })()
       )}
 
       {editModal && (

@@ -1,6 +1,7 @@
 import { Server } from "socket.io";
 import http from "http";
 import express from "express";
+// PublicMessage model and public-room handlers removed when public chat feature was disabled
 
 const app = express();
 const server = http.createServer(app);
@@ -77,6 +78,9 @@ io.on("connection", (socket) => {
       console.error("leaveGroup error", err);
     }
   });
+
+  // public room join/leave
+  // public chat handlers removed
 });
 
 export { io, app, server };

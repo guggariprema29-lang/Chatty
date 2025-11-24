@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, Gamepad2, Brain, Keyboard, Trophy } from "lucide-react";
 import toast from "react-hot-toast";
+import { axiosInstance } from "../lib/axios";
+import { useAuthStore } from "../store/useAuthStore";
 
-const GameLauncher = ({ isOpen, onClose, onStartGame, activeGames = [], currentUser }) => {
+const GameLauncher = ({ isOpen, onClose, onStartGame, chatId, currentUser }) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [activeGames, setActiveGames] = useState([]);
 
   const gameTypes = [
     {
@@ -47,6 +50,58 @@ const GameLauncher = ({ isOpen, onClose, onStartGame, activeGames = [], currentU
     if (game.status === 'in-progress') return 'Playing';
     return 'Waiting';
   };
+  
+
+  const normalizeGame = (game) => ({
+    ...game,
+    type: game.gameType || game.type,
+    currentTurn: game.gameState?.currentPlayer ?? null,
+    status: game.isActive ? (game.gameState ? 'in-progress' : 'waiting') : 'completed',
+  });
+
+  useEffect(() => {
+    if (!isOpen || !chatId) return;
+
+    let mounted = true;
+    const socket = useAuthStore.getState().socket;
+
+    const load = async () => {
+      try {
+        const res = await axiosInstance.get(`/games/chat/${chatId}/active`);
+        if (!mounted) return;
+        setActiveGames(res.data.map(normalizeGame));
+      } catch (err) {
+        console.error("Failed to load active games:", err);
+      }
+    };
+
+    load();
+
+    if (socket) {
+      socket.on("newGame", (game) => {
+        setActiveGames((prev) => [normalizeGame(game), ...prev]);
+        toast.success("New game started! 🎮");
+      });
+
+      socket.on("gameUpdate", (updatedGame) => {
+        setActiveGames((prev) => prev.map((g) => (g._id === updatedGame._id ? normalizeGame(updatedGame) : g)));
+      });
+
+      socket.on("gameEnded", (ended) => {
+        const id = ended?._id || ended;
+        setActiveGames((prev) => prev.filter((g) => g._id !== id));
+      });
+    }
+
+    return () => {
+      mounted = false;
+      if (socket) {
+        socket.off("newGame");
+        socket.off("gameUpdate");
+        socket.off("gameEnded");
+      }
+    };
+  }, [isOpen, chatId]);
 
   if (!isOpen) return null;
 
@@ -68,27 +123,16 @@ const GameLauncher = ({ isOpen, onClose, onStartGame, activeGames = [], currentU
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {gameTypes.map((game) => {
               const Icon = game.icon;
-          import { useEffect } from "react";
-          import { axiosInstance } from "../lib/axios";
-          import { useAuthStore } from "../store/useAuthStore";
               return (
                 <button
-          const GameLauncher = ({ isOpen, onClose, onStartGame, chatId, chatType }) => {
-            const [activeGames, setActiveGames] = useState([]);
-            const [isLoading, setIsLoading] = useState(false);
-            const { authUser } = useAuthStore();
-            const socket = useAuthStore.getState().socket;
+                  key={game.id}
+                  onClick={() => handleStartGame(game)}
                   disabled={isLoading}
                   className="btn btn-outline h-auto flex-col p-4 gap-2 hover:scale-105 transition-transform"
                 >
                   <Icon className={game.color} size={32} />
-                await onStartGame(gameType);
-                    <p className="font-semibold">{game.name}</p>
-                    <p className="text-xs text-base-content/60">{game.description}</p>
-                  </div>
-                  {isLoading && (
-                    <span className="loading loading-spinner loading-sm"></span>
-                  )}
+                  <p className="font-semibold">{game.name}</p>
+                  <p className="text-xs text-base-content/60">{game.description}</p>
                 </button>
               );
             })}
@@ -98,64 +142,12 @@ const GameLauncher = ({ isOpen, onClose, onStartGame, activeGames = [], currentU
         {activeGames.length > 0 && (
           <div>
             <h4 className="text-sm font-semibold mb-3 text-base-content/70">Active Games</h4>
-            const normalizeGame = (game) => {
-              return {
-                ...game,
-                type: game.gameType || game.type,
-                currentTurn: game.gameState?.currentPlayer ?? null,
-                status: game.isActive ? (game.gameState ? 'in-progress' : 'waiting') : 'completed',
-              };
-            };
-
-            useEffect(() => {
-              if (!isOpen || !chatId) return;
-
-              let mounted = true;
-
-              const load = async () => {
-                try {
-                  const res = await axiosInstance.get(`/games/chat/${chatId}/active`);
-                  if (!mounted) return;
-                  setActiveGames(res.data.map(normalizeGame));
-                } catch (err) {
-                  console.error("Failed to load active games:", err);
-                }
-              };
-
-              load();
-
-              if (socket) {
-                socket.on("newGame", (game) => {
-                  setActiveGames((prev) => [normalizeGame(game), ...prev]);
-                  toast.success("New game started! 🎮");
-                });
-
-                socket.on("gameUpdate", (updatedGame) => {
-                  setActiveGames((prev) => prev.map(g => g._id === updatedGame._id ? normalizeGame(updatedGame) : g));
-                });
-
-                socket.on("gameEnded", (ended) => {
-                  // backend may emit full game or id
-                  const id = ended?._id || ended;
-                  setActiveGames((prev) => prev.filter(g => g._id !== id));
-                });
-              }
-
-              return () => {
-                mounted = false;
-                if (socket) {
-                  socket.off("newGame");
-                  socket.off("gameUpdate");
-                  socket.off("gameEnded");
-                }
-              };
-            }, [isOpen, chatId, socket]);
             <div className="space-y-2">
               {activeGames.map((game) => {
-                const gameType = gameTypes.find(g => g.id === game.type);
+                const gameType = gameTypes.find((g) => g.id === game.type);
                 const Icon = gameType?.icon || Gamepad2;
                 const isMyTurn = game.currentTurn === currentUser?._id;
-                
+
                 return (
                   <div
                     key={game._id}
@@ -170,7 +162,7 @@ const GameLauncher = ({ isOpen, onClose, onStartGame, activeGames = [], currentU
                         <div>
                           <p className="font-semibold">{gameType?.name || game.type}</p>
                           <p className="text-xs text-base-content/60">
-                            vs {game.players?.find(p => p._id !== currentUser?._id)?.fullName || 'Unknown'}
+                            vs {game.players?.find((p) => p._id !== currentUser?._id)?.fullName || 'Unknown'}
                           </p>
                         </div>
                       </div>

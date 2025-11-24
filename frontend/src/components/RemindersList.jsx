@@ -79,9 +79,12 @@ const RemindersList = ({ isOpen, onClose }) => {
               <span className="badge badge-sm">{reminders.length}</span>
             )}
           </div>
-          <button onClick={onClose} className="btn btn-ghost btn-sm btn-circle">
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="btn btn-sm">Close</button>
+            <button onClick={onClose} className="btn btn-ghost btn-sm btn-circle">
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Filter Tabs */}
@@ -123,6 +126,12 @@ const RemindersList = ({ isOpen, onClose }) => {
                   ? "Completed reminders will show here"
                   : "Send a message like 'Meet at 5pm' to auto-create reminders"}
               </p>
+              {/* Add a clear Close button in the empty state so users can dismiss the modal */}
+              <div className="mt-6">
+                <button onClick={onClose} className="btn btn-sm btn-primary">
+                  Close
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-3">

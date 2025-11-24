@@ -99,7 +99,7 @@ export const getUnreadCount = async (req, res) => {
 
     res.status(200).json({ count });
   } catch (error) {
-    console.error("Error in getUnreadCount:", error.message);
+    console.error("Error in getUnreadCount:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };

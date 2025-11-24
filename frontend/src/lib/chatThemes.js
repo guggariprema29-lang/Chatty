@@ -201,6 +201,18 @@ export const applyTheme = (theme) => {
   if (theme.secondaryColor) root.style.setProperty("--chat-secondary", theme.secondaryColor);
   if (theme.backgroundColor) root.style.setProperty("--chat-bg", theme.backgroundColor);
   if (theme.messageColor) root.style.setProperty("--chat-text", theme.messageColor);
+  if (typeof theme.bubbleOpacity !== 'undefined') root.style.setProperty("--chat-bubble-opacity", String(theme.bubbleOpacity));
+  // background image (optional)
+  if (theme.backgroundImage) root.style.setProperty("--chat-bg-image", theme.backgroundImage);
+  else root.style.removeProperty("--chat-bg-image");
+
+  // Also set body background for immediate visual change
+  try {
+    if (theme.backgroundImage) document.body.style.background = theme.backgroundImage;
+    else if (theme.backgroundColor) document.body.style.background = theme.backgroundColor;
+  } catch (err) {
+    // ignore in non-browser environments
+  }
 };
 
 /**
